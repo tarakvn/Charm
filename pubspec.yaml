@@ -1,0 +1,26 @@
+name: hogwarts_spellcaster
+description: Harry Potter Spell App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  speech_to_text: 6.6.2
+  torch_light: 1.0.0
+  permission_handler: 11.3.1
+  cupertino_icons: ^1.0.8
+  android_intent_plus: ^5.0.0 # برای Alohomora
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - background.png
