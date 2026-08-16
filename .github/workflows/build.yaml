@@ -1,0 +1,78 @@
+name: Build APK
+
+on:
+  workflow_dispatch:   # دستی اجرا می‌شود
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Create Flutter project and configure
+        run: |
+          # ساخت پروژه جدید فلاتر با نام دلخواه
+          flutter create --org com.hogwarts --project-name charm_assistant temp_app
+          cp -f pubspec.yaml temp_app/pubspec.yaml
+          rm -rf temp_app/lib
+          cp -r lib temp_app/lib
+          
+          # کپی کردن عکس پس‌زمینه به پوشه ریشه پروژه موقت فلاتر
+          if [ -f "background.png" ]; then
+            cp background.png temp_app/background.png
+          fi
+          
+          # بررسی و قرار دادن آیکون سفارشی
+          if [ -f "icon.png" ]; then
+            echo "Icon found, setting up app icon..."
+            sudo apt-get update && sudo apt-get install -y imagemagick
+            
+            # ساخت سایزهای مختلف آیکون برای اندروید
+            convert icon.png -resize 48x48 temp_app/android/app/src/main/res/mipmap-mdpi/ic_launcher.png || true
+            convert icon.png -resize 72x72 temp_app/android/app/src/main/res/mipmap-hdpi/ic_launcher.png || true
+            convert icon.png -resize 96x96 temp_app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png || true
+            convert icon.png -resize 144x144 temp_app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png || true
+            convert icon.png -resize 192x192 temp_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png || true
+          fi
+
+          # تغییر نام نمایشی اپلیکیشن (Label) در اندروید به Charm Assistant
+          MANIFEST_PATH="temp_app/android/app/src/main/AndroidManifest.xml"
+          sed -i 's/android:label="[^"]*"/android:label="Charm Assistant"/' "$MANIFEST_PATH"
+          
+          # تنظیم minSdk روی 23 برای سازگاری با مجوزها
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' temp_app/android/app/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' temp_app/android/app/build.gradle || true
+          
+          # تزریق دسترسی‌های لازم (میکروفون، دوربین، چراغ‌قوه و اینترنت)
+          sed -i '/<uses-permission/d' "$MANIFEST_PATH"
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.FLASHLIGHT" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />' "$MANIFEST_PATH"
+          
+          cd temp_app
+          flutter pub get
+
+      - name: Build APK
+        working-directory: temp_app
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hogwarts-spellcaster-apk
+          path: temp_app/build/app/outputs/flutter-apk/app-release.apk
